@@ -18,6 +18,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmd_line, void (**eip) (void), void **esp);
@@ -416,9 +418,6 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   return success;
 }
 
-/* load() helpers. */
-
-static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -497,24 +496,38 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+      uint8_t *kpage = frame_get (PAL_USER);
       if (kpage == NULL)
         return false;
+      
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          palloc_free_page (kpage);
+          frame_free (kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
+      
 
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-          palloc_free_page (kpage);
+          frame_free (kpage);
           return false; 
         }
+      
+
+      /*lock_acquire(&thread_current()->sup_page_table_lock);
+      struct sup_page_entry *spte = malloc(sizeof(struct sup_page_entry));
+      spte->file = file;
+      spte->ofs = ofs;
+      spte->user_page = upage;
+      spte->read_bytes = read_bytes;
+      spte->zero_bytes = zero_bytes;
+      spte->writable = writable;
+      list_push_back(&thread_current()->sup_page_table,&spte->elem);
+      lock_release(&thread_current()->sup_page_table_lock);*/
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -614,14 +627,14 @@ setup_stack (const char *cmd_line, void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = frame_get (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
       if (install_page (upage, kpage, true))
         success = init_cmd_line (kpage, upage, cmd_line, esp);
       else
-        palloc_free_page (kpage);
+        frame_free (kpage);
     }
   return success;
 }
@@ -635,7 +648,7 @@ setup_stack (const char *cmd_line, void **esp)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();

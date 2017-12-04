@@ -125,6 +125,8 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    struct list sup_page_table;         /* supplemental page table. */
+    struct lock sup_page_table_lock;    /* supplemental page table lock. */
   };
 
 /* Tracks the completion of a process.
