@@ -21,6 +21,7 @@
 #include "vm/frame.h"
 #include "vm/page.h"
 
+static bool setup_stack (const char *cmd_line, void **esp);
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmd_line, void (**eip) (void), void **esp);
 
@@ -287,7 +288,6 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (const char *cmd_line, void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -486,6 +486,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  //printf("called load_segment\n");
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
@@ -495,30 +496,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      uint8_t *kpage = frame_get (PAL_USER);
-      if (kpage == NULL)
-        return false;
-      
-
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          frame_free (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-      
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
-        {
-          frame_free (kpage);
-          return false; 
-        }
-      
-
-      /*lock_acquire(&thread_current()->sup_page_table_lock);
+      lock_acquire(&thread_current()->sup_page_table_lock);
       struct sup_page_entry *spte = malloc(sizeof(struct sup_page_entry));
       spte->file = file;
       spte->ofs = ofs;
@@ -527,11 +505,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       spte->zero_bytes = zero_bytes;
       spte->writable = writable;
       list_push_back(&thread_current()->sup_page_table,&spte->elem);
-      lock_release(&thread_current()->sup_page_table_lock);*/
+      lock_release(&thread_current()->sup_page_table_lock);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
+      ofs += page_read_bytes;
       upage += PGSIZE;
     }
   return true;

@@ -2,9 +2,12 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 #include "vm/page.h"
+#include "vm/frame.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -149,43 +152,45 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
   
-  /*if(user){
-    struct list_elem *e = find_spte(fault_addr);
-    struct sup_page_entry *spte = list_entry(e,struct sup_page_entry,elem);
-    if(spte)
-      load_from_file(spte);
-    else{
-      printf ("Page fault at %p: %s error %s page in %s context.\n",
-            fault_addr,
-            not_present ? "not present" : "rights violation",
-            write ? "writing" : "reading",
-            user ? "user" : "kernel");
-      kill (f);
-    }
-  }
-  else{
-    f->eip = (void (*) (void)) f->eax;
-    f->eax = 0;
+  if(fault_addr > f->esp-32 && fault_addr < PHYS_BASE){
+    void *upage = pg_round_down(fault_addr);
+    void *kpage = frame_get (PAL_USER | PAL_ZERO);
+    if (!install_page (upage, kpage, true))
+      frame_free (kpage);
     return;
-  }*/
+  }
+  bool success = false;
+  struct list_elem *e = find_spte(fault_addr);
+  if(e){
+    struct sup_page_entry *spte = list_entry(e,struct sup_page_entry,elem);
+    success = load_from_file(spte);
+    return;
+  }
+
   /* Handle bad dereferences from system call implementations. */
-  /*if (!user) 
+  if (!user) 
     {
       f->eip = (void (*) (void)) f->eax;
       f->eax = 0;
       return;
     }
-  */
+  printf ("Page fault at %p: %s error %s page in %s context.\n",
+        fault_addr,
+        not_present ? "not present" : "rights violation",
+        write ? "writing" : "reading",
+        user ? "user" : "kernel");
+  kill (f);
+  
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
+  /*printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);
-  
+  */
 }
 

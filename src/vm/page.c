@@ -6,6 +6,7 @@
 #include "userprog/process.h"
 #include <list.h>
 #include <string.h>
+#include <stdio.h>
 
 struct list_elem *find_spte(void *fault_addr){
   void *upage = pg_round_down(fault_addr);
@@ -14,7 +15,7 @@ struct list_elem *find_spte(void *fault_addr){
       e != list_end(&thread_current()->sup_page_table);
       e = list_next(e))
   {
-    if((struct sup_page_entry*)list_entry(e,struct sup_page_entry,elem) == upage)
+    if(list_entry(e,struct sup_page_entry,elem)->user_page == upage)
       return e;
   }
   return NULL;
@@ -24,8 +25,9 @@ struct list_elem *find_spte(void *fault_addr){
 bool load_from_file(struct sup_page_entry *spte){
     /* Get a page of memory. */
   uint8_t *kpage = frame_get (PAL_USER);
-  if (kpage == NULL)
+  if (kpage == NULL){
     return false;
+  }
       
 
     /* Load this page. */
@@ -41,4 +43,5 @@ bool load_from_file(struct sup_page_entry *spte){
     frame_free (kpage);
     return false; 
   }
+  return true;
 }
