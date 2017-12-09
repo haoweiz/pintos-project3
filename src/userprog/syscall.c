@@ -340,13 +340,12 @@ sys_read (int handle, void *udst_, unsigned size)
       off_t retval;
 
       /* Check that touching this page is okay. */
-      if (/*udst >= PHYS_BASE*/!verify_user(udst)) 
+      if (!verify_user (udst)) 
         {
-          struct list_elem *e = find_spte(udst);
-          if(e == NULL){
-            lock_release (&fs_lock);
-            thread_exit ();
-          }
+		  struct list_elem *e=find_spte(udst);
+		  if(e==NULL){
+          lock_release (&fs_lock);
+          thread_exit ();}
         }
 
       /* Read from file into page. */
@@ -481,9 +480,9 @@ syscall_exit (void)
       struct file_descriptor *fd;
       fd = list_entry (e, struct file_descriptor, elem);
       next = list_next (e);
-      lock_acquire (&fs_lock);
+      //lock_acquire (&fs_lock);
       file_close (fd->file);
-      lock_release (&fs_lock);
+      //lock_release (&fs_lock);
       free (fd);
     }
 }

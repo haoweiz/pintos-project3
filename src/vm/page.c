@@ -9,8 +9,7 @@
 #include <stdio.h>
 
 struct list_elem *find_spte(void *fault_addr){
-  void *fa = fault_addr;
-  void *upage = pg_round_down(fa);
+  void *upage = pg_round_down(fault_addr);
   struct list_elem *e;
   for(e = list_begin(&thread_current()->sup_page_table);
       e != list_end(&thread_current()->sup_page_table);

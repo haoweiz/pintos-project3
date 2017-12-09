@@ -151,8 +151,14 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-  
-  if(fault_addr > f->esp-32 && fault_addr < PHYS_BASE){
+    /*if (!user) 
+    {
+      f->eip = (void (*) (void)) f->eax;
+      f->eax = 0;
+      //return;
+    }*/
+ if(not_present) 
+{  if(fault_addr > f->esp-32 && fault_addr < PHYS_BASE){
     void *upage = pg_round_down(fault_addr);
     void *kpage = frame_get (PAL_USER | PAL_ZERO);
     if (!install_page (upage, kpage, true))
@@ -166,7 +172,7 @@ page_fault (struct intr_frame *f)
     success = load_from_file(spte);
     return;
   }
-
+}
   /* Handle bad dereferences from system call implementations. */
   if (!user) 
     {
