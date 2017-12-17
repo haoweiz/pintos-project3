@@ -480,9 +480,9 @@ syscall_exit (void)
       struct file_descriptor *fd;
       fd = list_entry (e, struct file_descriptor, elem);
       next = list_next (e);
-      //lock_acquire (&fs_lock);
+      lock_acquire (&fs_lock);
       file_close (fd->file);
-      //lock_release (&fs_lock);
+      lock_release (&fs_lock);
       free (fd);
     }
 }
