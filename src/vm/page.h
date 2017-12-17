@@ -5,7 +5,7 @@
 #include "threads/palloc.h"
 #include <list.h>
 
-struct spt_elem{
+struct sup_page_entry{
   uint8_t *user_page;
   struct file *file;
   off_t ofs;
@@ -16,6 +16,6 @@ struct spt_elem{
 };
 
 struct list_elem *find_spte(void *fault_addr);
-bool load_from_file(struct spt_elem *spte);
+bool load_from_file(struct sup_page_entry *spte);
 
 #endif 

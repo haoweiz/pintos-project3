@@ -342,8 +342,10 @@ sys_read (int handle, void *udst_, unsigned size)
       /* Check that touching this page is okay. */
       if (!verify_user (udst)) 
         {
+		  struct list_elem *e=find_spte(udst);
+		  if(e==NULL){
           lock_release (&fs_lock);
-          thread_exit ();
+          thread_exit ();}
         }
 
       /* Read from file into page. */
