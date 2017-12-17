@@ -13,7 +13,6 @@
 #include "threads/synch.h"
 #include "devices/timer.h"
 #include "threads/vaddr.h"
-#include "vm/frame.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/syscall.h"
@@ -98,8 +97,6 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   load_avg = fix_int (0);
-  list_init (&frame_table);
-  lock_init (&frame_table_lock);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -617,7 +614,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->wait_status = NULL;
   list_init (&t->fds);
   list_init (&t->sup_page_table);
-  lock_init (&t->sup_page_table_lock);
   t->next_handle = 2;
   t->magic = THREAD_MAGIC;
   sema_init (&t->timer_sema, 0);

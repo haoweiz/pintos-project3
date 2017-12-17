@@ -1,5 +1,4 @@
 #include "vm/page.h"
-#include "vm/frame.h"
 #include "threads/vaddr.h"
 #include "threads/thread.h"
 #include "filesys/file.h"
@@ -15,16 +14,16 @@ struct list_elem *find_spte(void *fault_addr){
       e != list_end(&thread_current()->sup_page_table);
       e = list_next(e))
   {
-    if(list_entry(e,struct sup_page_entry,elem)->user_page == upage)
+    if(list_entry(e,struct spt_elem,elem)->user_page == upage)
       return e;
   }
   return NULL;
 }
 
 
-bool load_from_file(struct sup_page_entry *spte){
+bool load_from_file(struct spt_elem *spte){
     /* Get a page of memory. */
-  uint8_t *kpage = frame_get (PAL_USER);
+  uint8_t *kpage = palloc_get_page (PAL_USER);
   if (kpage == NULL){
     return false;
   }
@@ -32,7 +31,7 @@ bool load_from_file(struct sup_page_entry *spte){
 
     /* Load this page. */
   if (file_read_at (spte->file, kpage, spte->read_bytes, spte->ofs) != (int) spte->read_bytes){
-    frame_free (kpage);
+    palloc_free_page (kpage);
     return false; 
   }
   memset (kpage + spte->read_bytes, 0, spte->zero_bytes);
@@ -40,7 +39,7 @@ bool load_from_file(struct sup_page_entry *spte){
 
     /* Add the page to the process's address space. */
   if (!install_page (spte->user_page, kpage, spte->writable)){
-    frame_free (kpage);
+    palloc_free_page (kpage);
     return false; 
   }
   return true;
