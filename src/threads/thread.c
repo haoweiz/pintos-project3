@@ -13,6 +13,7 @@
 #include "threads/synch.h"
 #include "devices/timer.h"
 #include "threads/vaddr.h"
+#include "vm/frame.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/syscall.h"
@@ -93,6 +94,7 @@ thread_init (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
 
+  list_init (&frame_table);
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);

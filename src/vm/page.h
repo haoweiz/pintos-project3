@@ -6,6 +6,7 @@
 #include <list.h>
 
 struct spt_elem{
+  int code_or_data;
   uint8_t *user_page;
   struct file *file;
   off_t ofs;

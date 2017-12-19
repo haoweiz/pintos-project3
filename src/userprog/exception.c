@@ -8,6 +8,7 @@
 #include "threads/palloc.h"
 #include "userprog/process.h"
 #include "vm/page.h"
+#include "vm/frame.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -155,9 +156,9 @@ page_fault (struct intr_frame *f)
   if(not_present){  
     if(fault_addr > f->esp-32 && fault_addr < PHYS_BASE){
       void *upage = pg_round_down(fault_addr);
-      void *kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+      void *kpage = frame_get (PAL_USER | PAL_ZERO);
       if (!install_page (upage, kpage, true))
-        palloc_free_page (kpage);
+        frame_free (kpage);
       return;
     }
     struct list_elem *e = find_spte(fault_addr);

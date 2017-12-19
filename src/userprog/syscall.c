@@ -29,6 +29,8 @@ static int sys_write (int handle, void *usrc_, unsigned size);
 static int sys_seek (int handle, unsigned position);
 static int sys_tell (int handle);
 static int sys_close (int handle);
+static int sys_mmap (int fd, void *addr);
+static void sys_munmap(int mapping);
  
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
@@ -46,7 +48,7 @@ syscall_init (void)
 /* System call handler. */
 static void
 syscall_handler (struct intr_frame *f) 
-{//printf("syscall:%d\n",*(int*)f->esp);
+{
   typedef int syscall_function (int, int, int);
 
   /* A system call. */
@@ -72,6 +74,8 @@ syscall_handler (struct intr_frame *f)
       {2, (syscall_function *) sys_seek},      /*  10  */
       {1, (syscall_function *) sys_tell},      /*  11  */
       {1, (syscall_function *) sys_close},     /*  12  */
+      {2, (syscall_function *) sys_mmap},      /*  13  */
+      {1, (syscall_function *) sys_munmap},    /*  14  */
     };
 
   const struct syscall *sc;
@@ -316,7 +320,7 @@ sys_filesize (int handle)
 /* Read system call. */
 static int
 sys_read (int handle, void *udst_, unsigned size) 
-{
+{printf("udst=%p,size=%d in head\n",udst_,size);
   uint8_t *udst = udst_;
   struct file_descriptor *fd;
   int bytes_read = 0;
@@ -340,8 +344,13 @@ sys_read (int handle, void *udst_, unsigned size)
       size_t read_amt = size < page_left ? size : page_left;
       off_t retval;
 
+      if (udst >= PHYS_BASE){
+        lock_release (&fs_lock);
+        thread_exit ();
+      }
+
       /* Check that touching this page is okay. */
-      if (!verify_user (udst)) 
+      if (pagedir_get_page (thread_current ()->pagedir, udst) == NULL) 
         {
           struct list_elem *e=find_spte(udst);
           if(e == NULL){
@@ -352,6 +361,12 @@ sys_read (int handle, void *udst_, unsigned size)
             load_from_file(list_entry(e,struct spt_elem,elem));
           }
         }
+
+      struct list_elem *e=find_spte(udst);
+      if (e != NULL && list_entry (e, struct spt_elem, elem)->code_or_data == 0){
+        lock_release (&fs_lock);
+        thread_exit ();
+      }
 
       /* Read from file into page. */
       retval = file_read (fd->file, udst, read_amt);
@@ -472,6 +487,16 @@ sys_close (int handle)
   free (fd);
   return 0;
 }
+
+/* Mmap system call. */
+static int sys_mmap (int fd, void *addr){
+  return 0;
+}
+
+/* Unmap system call. */
+static void sys_munmap(int mapping){
+}
+
  
 /* On thread exit, close all open files. */
 void

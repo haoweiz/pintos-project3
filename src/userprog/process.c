@@ -19,6 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "vm/page.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmd_line, void (**eip) (void), void **esp);
@@ -495,6 +496,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       struct spt_elem *spte = malloc(sizeof(struct spt_elem));
+      spte->code_or_data = code_or_data;
       spte->file = file;
       spte->ofs = ofs;
       spte->user_page = upage;
@@ -509,6 +511,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       ofs += page_read_bytes;        /* Very very important  */
       upage += PGSIZE;
     }
+  code_or_data++;
   return true;
 }
 
@@ -602,14 +605,14 @@ setup_stack (const char *cmd_line, void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = frame_get (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
       if (install_page (upage, kpage, true))
         success = init_cmd_line (kpage, upage, cmd_line, esp);
       else
-        palloc_free_page (kpage);
+        frame_free (kpage);
     }
   return success;
 }
