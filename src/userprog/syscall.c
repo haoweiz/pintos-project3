@@ -13,6 +13,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/page.h"
  
  
 static int sys_halt (void);
@@ -45,7 +46,7 @@ syscall_init (void)
 /* System call handler. */
 static void
 syscall_handler (struct intr_frame *f) 
-{
+{//printf("syscall:%d\n",*(int*)f->esp);
   typedef int syscall_function (int, int, int);
 
   /* A system call. */
@@ -58,19 +59,19 @@ syscall_handler (struct intr_frame *f)
   /* Table of system calls. */
   static const struct syscall syscall_table[] =
     {
-      {0, (syscall_function *) sys_halt},
-      {1, (syscall_function *) sys_exit},
-      {1, (syscall_function *) sys_exec},
-      {1, (syscall_function *) sys_wait},
-      {2, (syscall_function *) sys_create},
-      {1, (syscall_function *) sys_remove},
-      {1, (syscall_function *) sys_open},
-      {1, (syscall_function *) sys_filesize},
-      {3, (syscall_function *) sys_read},
-      {3, (syscall_function *) sys_write},
-      {2, (syscall_function *) sys_seek},
-      {1, (syscall_function *) sys_tell},
-      {1, (syscall_function *) sys_close},
+      {0, (syscall_function *) sys_halt},      /*  0   */
+      {1, (syscall_function *) sys_exit},      /*  1   */
+      {1, (syscall_function *) sys_exec},      /*  2   */
+      {1, (syscall_function *) sys_wait},      /*  3   */
+      {2, (syscall_function *) sys_create},    /*  4   */
+      {1, (syscall_function *) sys_remove},    /*  5   */
+      {1, (syscall_function *) sys_open},      /*  6   */
+      {1, (syscall_function *) sys_filesize},  /*  7   */
+      {3, (syscall_function *) sys_read},      /*  8   */
+      {3, (syscall_function *) sys_write},     /*  9   */
+      {2, (syscall_function *) sys_seek},      /*  10  */
+      {1, (syscall_function *) sys_tell},      /*  11  */
+      {1, (syscall_function *) sys_close},     /*  12  */
     };
 
   const struct syscall *sc;
@@ -221,7 +222,7 @@ sys_create (const char *ufile, unsigned initial_size)
   lock_release (&fs_lock);
  
   palloc_free_page (kfile);
- 
+  
   return ok;
 }
  
@@ -342,10 +343,14 @@ sys_read (int handle, void *udst_, unsigned size)
       /* Check that touching this page is okay. */
       if (!verify_user (udst)) 
         {
-		  struct list_elem *e=find_spte(udst);
-		  if(e==NULL){
-          lock_release (&fs_lock);
-          thread_exit ();}
+          struct list_elem *e=find_spte(udst);
+          if(e == NULL){
+            lock_release (&fs_lock);
+            thread_exit ();
+          }
+          else{
+            load_from_file(list_entry(e,struct spt_elem,elem));
+          }
         }
 
       /* Read from file into page. */

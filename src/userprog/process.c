@@ -18,10 +18,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "vm/frame.h"
 #include "vm/page.h"
 
-static bool setup_stack (const char *cmd_line, void **esp);
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmd_line, void (**eip) (void), void **esp);
 
@@ -91,7 +89,7 @@ start_process (void *exec_)
         = malloc (sizeof *exec->wait_status);
       success = exec->wait_status != NULL; 
     }
-
+ 
   /* Initialize wait_status. */
   if (success) 
     {
@@ -288,6 +286,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
+static bool setup_stack (const char *cmd_line, void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -486,7 +485,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  //printf("called load_segment\n");
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
@@ -496,8 +494,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      lock_acquire(&thread_current()->sup_page_table_lock);
-      struct sup_page_entry *spte = malloc(sizeof(struct sup_page_entry));
+      struct spt_elem *spte = malloc(sizeof(struct spt_elem));
       spte->file = file;
       spte->ofs = ofs;
       spte->user_page = upage;
@@ -505,12 +502,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       spte->zero_bytes = zero_bytes;
       spte->writable = writable;
       list_push_back(&thread_current()->sup_page_table,&spte->elem);
-      lock_release(&thread_current()->sup_page_table_lock);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
-      ofs += page_read_bytes;
+      ofs += page_read_bytes;        /* Very very important  */
       upage += PGSIZE;
     }
   return true;
@@ -606,14 +602,14 @@ setup_stack (const char *cmd_line, void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = frame_get (PAL_USER | PAL_ZERO);
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
       if (install_page (upage, kpage, true))
         success = init_cmd_line (kpage, upage, cmd_line, esp);
       else
-        frame_free (kpage);
+        palloc_free_page (kpage);
     }
   return success;
 }
