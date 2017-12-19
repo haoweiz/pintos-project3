@@ -496,12 +496,13 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       struct spt_elem *spte = malloc(sizeof(struct spt_elem));
+      spte->is_load = 0;
       spte->code_or_data = code_or_data;
       spte->file = file;
       spte->ofs = ofs;
       spte->user_page = upage;
-      spte->read_bytes = read_bytes;
-      spte->zero_bytes = zero_bytes;
+      spte->read_bytes = page_read_bytes;
+      spte->zero_bytes = page_zero_bytes;
       spte->writable = writable;
       list_push_back(&thread_current()->sup_page_table,&spte->elem);
 

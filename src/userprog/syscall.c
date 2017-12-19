@@ -320,7 +320,7 @@ sys_filesize (int handle)
 /* Read system call. */
 static int
 sys_read (int handle, void *udst_, unsigned size) 
-{printf("udst=%p,size=%d in head\n",udst_,size);
+{
   uint8_t *udst = udst_;
   struct file_descriptor *fd;
   int bytes_read = 0;
@@ -490,11 +490,73 @@ sys_close (int handle)
 
 /* Mmap system call. */
 static int sys_mmap (int fd, void *addr){
-  return 0;
+  struct file_descriptor *file_des = lookup_fd (fd);
+  if(!is_user_vaddr(addr)||fd == STDOUT_FILENO||fd == STDIN_FILENO||((int) addr % PGSIZE) != 0||addr == NULL)
+    return -1;
+ 
+  struct file *f = file_reopen (file_des->file);
+  thread_current()->mmapid++;
+
+  int32_t ofs = 0;
+  int read_bytes = file_length(f);
+  if(read_bytes == 0)
+    return -1;
+
+  struct list_elem *e;
+  for(e = list_begin (&thread_current()->sup_page_table);e != list_end (&thread_current()->sup_page_table);e = list_next (e)){
+    if(list_entry(e,struct spt_elem,elem)->user_page == addr)
+      return -1;
+  }
+
+  while (read_bytes > 0) {
+      /* Insert in supplemental page table.  */
+      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+      struct spt_elem *spte = malloc(sizeof(struct spt_elem));
+      spte->is_load = 0;
+      spte->code_or_data = 2;
+      spte->file = f;
+      spte->ofs = ofs;
+      spte->user_page = addr;
+      spte->read_bytes = page_read_bytes;
+      spte->zero_bytes = page_zero_bytes;
+      spte->writable = true;
+      list_push_back(&thread_current()->sup_page_table,&spte->elem);
+
+      /* Advance. */
+      read_bytes -= page_read_bytes;
+      ofs += page_read_bytes;        /* Very very important  */
+      addr += PGSIZE;
+
+      /* Insert in Mmap_list.  */
+      struct mmap_elem *mmape = malloc(sizeof(struct mmap_elem));
+      mmape->spte = spte;
+      mmape->mmapid = thread_current()->mmapid;
+      list_push_back(&thread_current()->mmap_list,&mmape->elem);
+  }
+  return thread_current()->mmapid;
 }
 
 /* Unmap system call. */
 static void sys_munmap(int mapping){
+  struct list_elem *e;
+  for (e = list_begin(&thread_current()->mmap_list);e != list_end(&thread_current()->mmap_list);e = list_next(e)){
+    if(list_entry(e,struct mmap_elem,elem)->mmapid == mapping){
+      struct mmap_elem *mmape = list_entry(e,struct mmap_elem,elem);
+      if(pagedir_is_dirty(thread_current()->pagedir, mmape->spte->user_page)){
+	lock_acquire(&fs_lock);
+	file_write_at(mmape->spte->file, mmape->spte->user_page,mmape->spte->read_bytes, mmape->spte->ofs);
+	lock_release(&fs_lock);
+        frame_free(pagedir_get_page(thread_current()->pagedir, mmape->spte->user_page));
+        pagedir_clear_page(thread_current()->pagedir, mmape->spte->user_page);
+        list_remove(&mmape->elem);
+        list_remove(&mmape->spte->elem);
+      }
+      list_remove(&mmape->spte->elem);
+      list_remove(&mmape->elem);
+    }
+  }
 }
 
  

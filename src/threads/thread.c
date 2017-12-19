@@ -616,6 +616,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->wait_status = NULL;
   list_init (&t->fds);
   list_init (&t->sup_page_table);
+  list_init (&t->mmap_list);
+  t->mmapid = 0;
   t->next_handle = 2;
   t->magic = THREAD_MAGIC;
   sema_init (&t->timer_sema, 0);

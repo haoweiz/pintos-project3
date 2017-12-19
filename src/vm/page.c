@@ -42,5 +42,6 @@ bool load_from_file(struct spt_elem *spte){
     palloc_free_page (kpage);
     return false; 
   }
+  spte->is_load = 1;
   return true;
 }

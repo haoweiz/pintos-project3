@@ -128,6 +128,10 @@ struct thread
 
     /* Owned by page.c.   */
     struct list sup_page_table;         /* Supplemental page table. */
+
+    /* Owned by syscall.c */
+    int mmapid;                         /* Mmap ID.   */
+    struct list mmap_list;              /* Mmap list. */
   };
 
 /* Tracks the completion of a process.
